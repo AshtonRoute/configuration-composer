@@ -48,10 +48,10 @@ const FilePathSchema = Joi.alternatives().try([
 
 const ConfigItemSchema = Joi.object({
   watch: Joi.boolean().default(false),
-  dependencies: Joi.array().items(FilePathSchema).unique(),
-  templates: Joi.array().items(FilePathSchema).unique(),
-  datasources: Joi.array().items(DataSourceSchema).unique('url'),
-  files: Joi.array().items(FileSchema).unique((a, b) => a.input_path === b.input_path || a.output_path === b.output_path),
+  dependencies: Joi.array().items(FilePathSchema).unique().default([]),
+  templates: Joi.array().items(FilePathSchema).unique().default([]),
+  datasources: Joi.array().items(DataSourceSchema).unique('url').default([]),
+  files: Joi.array().items(FileSchema).default([]).unique((a, b) => a.input_path === b.input_path || a.output_path === b.output_path),
   on_change: onChangeSchema,
   args: argsSchema,
 });

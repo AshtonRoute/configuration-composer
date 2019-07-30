@@ -24,6 +24,11 @@ function watchFiles(args) {
 
   return new Promise((res, rej) => {
       try {
+        if (!paths || !paths.length) {
+          res();
+          return;
+        }
+
         const watcher = chokidar.watch(paths, {
           alwaysStat: true,
           ...options,
@@ -206,7 +211,7 @@ async function main() {
           },
         });
       })
-    );
+    ).then(arr => arr.filter(v => v));
 
     if (watch) {
       watchDepItems.forEach(({ watcher }) => {
@@ -240,14 +245,17 @@ async function main() {
     });
 
     if (watch) {
-      watchItems.push(watchFilesItem.watcher);
+      if (watchFilesItem) {
+        watchItems.push(watchFilesItem.watcher);
+      }
     } else {
       [
         ...watchDepItems,
         watchFilesItem,
-      ].forEach(({ watcher }) => {
-        watcher.close();
-      });
+      ].filter(v => v)
+       .forEach(({ watcher }) => {
+          watcher.close();
+        });
     }
   }));
 
