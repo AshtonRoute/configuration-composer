@@ -1,0 +1,17 @@
+- watch: true
+  dependencies:
+  - /smth/somefile
+
+  datasources:
+  - url: file:///datasources/**/*.yml
+    alias: test
+
+  templates:
+  - /templates/template1.tmpl.yml
+  - /templates/smth/**/*.tmpl
+
+  files:
+  - input_path: /files/template1.tmpl.yml
+    output_path: /output/[name].[ext]
+  - input_path: /files/smth/**/*.tmpl
+    output_path: /output/smth/[subdirectory]/[name].[ext]

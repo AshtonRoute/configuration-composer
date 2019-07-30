@@ -1,0 +1,7 @@
+**/node_modules
+**/.gitignore
+**/.npm
+**/.node_repl_history
+**/.sublime-workspace
+.idea
+.vscode

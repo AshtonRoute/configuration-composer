@@ -1,0 +1,16 @@
+version: '2.4'
+services:
+  app:
+    image: docker.home.lan/gomplate-composer
+    command: npm start
+    environment:
+      NODE_ENV: development
+    volumes:
+    - ./src:/app/src:rw
+    - ./package.json:/app/package.json:rw
+    - ./yarn.lock:/app/yarn.lock:rw
+    - ./test/config.yml:/config.yml:ro
+    - ./test/datasources:/datasources:ro
+    - ./test/templates:/templates:ro
+    - ./test/files:/files:ro
+    - ./test/output:/output:rw
