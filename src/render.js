@@ -70,6 +70,7 @@ function createFileObj(filepath, file) {
     const pathObj = parsePath(filepath, file.input_path);
     const outputPath = normalizePath(file.makeOutputPath(pathObj));
 
+    newFile.outputPath = outputPath;
     newFile.outputDir = path.dirname(outputPath);
   }
 
