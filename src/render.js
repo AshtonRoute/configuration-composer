@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs-extra');
 const throttle = require('p-throttle');
 
+const ENV = require('./environment').default;
 const log = require('./logger').default;
 const { parsePath, normalizePath } = require('./utils');
 
@@ -57,18 +58,22 @@ function spawnProc(args, filepath = '') {
 }
 
 function createFileObj(filepath, file) {
-  const pathObj = parsePath(filepath, file.input_path);
-  const outputPath = normalizePath(file.makeOutputPath(pathObj));
-
   const newFile = {
     filepath,
     file,
-    outputPath,
-    outputDir: path.dirname(outputPath),
+    outputPath: null,
+    outputDir: null,
     render: null,
   };
 
-  newFile.render = throttle(renderFile, 1, 500).bind(newFile);
+  if (file.output_path) {
+    const pathObj = parsePath(filepath, file.input_path);
+    const outputPath = normalizePath(file.makeOutputPath(pathObj));
+
+    newFile.outputDir = path.dirname(outputPath);
+  }
+
+  newFile.render = throttle(renderFile, 1, ENV.RENDER_FILE_DELAY).bind(newFile);
 
   return newFile;
 }
@@ -134,7 +139,11 @@ async function renderFile(args) {
   });
 
   execArgs.push('-f', this.filepath);
-  execArgs.push('-o', this.outputPath);
+
+  if (this.outputPath) {
+    execArgs.push('-o', this.outputPath);
+    await fs.ensureDir(this.outputDir);
+  }
 
   if (configItem.args) {
     configItem.args.forEach(v => {
@@ -142,15 +151,17 @@ async function renderFile(args) {
     })
   }
 
-  await fs.ensureDir(this.outputDir);
 
-  const { stderr } = await execFileAsync('gomplate', execArgs);
+  const { stderr } = await execFileAsync(ENV.GOMPLATE_BIN_PATH, execArgs);
 
   if (stderr) {
-    throw new Error(stderr);
+    const err = new Error(stderr);
+    err.path = this.filepath;
+
+    throw err;
   }
 
-  log.info({ input_path: this.filepath, output_path: this.outputPath, message: 'File updated' });
+  log.info({ input_path: this.filepath, output_path: this.outputPath, message: 'Template rendered' });
 
   const spawnArr = [];
 
@@ -168,27 +179,32 @@ async function renderFile(args) {
 }
 
 async function renderFiles(args) {
-    const {
-      cacheMaps,
-      changedObject,
-      configItem,
-    } = args;
+  const {
+    cacheMaps,
+    changedObject,
+    configItem,
+  } = args;
 
-    await Bluebird.map(cacheMaps.files, async ([filepath, file]) => {
-      try {
-        await file.render(args);
-      } catch (err) {
-        log.error({ path: filepath }, err);
-      }
-    }, { concurrency: 1000 });
+  const renderErrors = [];
 
+  await Bluebird.map(cacheMaps.files, async ([filepath, file]) => {
+    try {
+      await file.render(args);
+    } catch (err) {
+      err.path = filepath;
+
+      renderErrors.push(err);
+    }
+  }, { concurrency: ENV.RENDER_FILES_CONCURRENCY });
+
+  if (renderErrors.length !== cacheMaps.files.size) {
     const spawnArr = [];
 
     if (changedObject && changedObject.file.on_change) {
       spawnArr.push({
         on_change: changedObject.file.on_change,
         filepath: changedObject.filepath,
-       });
+      });
     }
 
     if (configItem.on_change) {
@@ -199,6 +215,15 @@ async function renderFiles(args) {
       spawnProc(v.on_change, v.filepath).catch(log.error);
     });
   }
+
+  if (renderErrors.length) {
+    const err = new Error('Couldn\'t render some files');
+
+    err.details = renderErrors;
+
+    throw err;
+  }
+}
 
 module.exports.createFileObj = createFileObj;
 module.exports.renderFiles = renderFiles;

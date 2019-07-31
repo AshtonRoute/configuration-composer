@@ -2,11 +2,11 @@ const anymatch = require('anymatch').default;
 const chokidar = require('chokidar');
 const throttle = require('p-throttle');
 
+const ENV = require('./environment').default;
 const { getConfig, parseConfig } = require('./config');
-const { renderFiles, createFileObj } = require ('./render');
+const { renderFiles, createFileObj } = require('./render');
 const log = require('./logger').default;
 const { parsePath } = require('./utils');
-const ENV = require('./environment').default;
 
 const eventsSet = new Set([
   'add',
@@ -19,102 +19,107 @@ function watchFiles(args) {
     options = {},
     cacheMap,
     createCacheEntry,
+    onError,
     onEvent,
   } = args;
 
   return new Promise((res, rej) => {
-      try {
-        if (!paths || !paths.length) {
-          res();
-          return;
-        }
-
-        const watcher = chokidar.watch(paths, {
-          alwaysStat: true,
-          ...options,
-        });
-
-        watcher.on('error', log.error);
-
-        watcher.on('ready', () => {
-          try {
-            const watchedPaths = watcher.getWatched();
-
-            res({
-              watcher,
-              watchedPaths,
-            });
-          } catch (err) {
-            rej(err);
-          }
-        });
-
-        watcher.on('all', async (event, filepath, stats) => {
-          try {
-            if (!stats) return;
-
-            let cachedObject = null;
-
-            if (cacheMap && !stats.isDirectory()) {
-              cachedObject = cacheMap.get(filepath);
-
-              if (event === 'add' || event === 'change') {
-                if (!cachedObject) {
-                  cachedObject = createCacheEntry(filepath, stats);
-
-                  if (cachedObject) {
-                    cacheMap.set(filepath, cachedObject);
-                  }
-                }
-              } else if (event === 'unlink') {
-                cachedObject = null;
-                cacheMap.delete(filepath);
-              }
-            }
-
-            if (onEvent) {
-              await onEvent({
-                event,
-                filepath,
-                stats,
-                cachedObject,
-                watcher,
-              });
-            }
-          } catch (err) {
-            log.error({ path: filepath }, err);
-          }
-        });
-      } catch (err) {
-        rej(err);
+    try {
+      if (!paths || !paths.length) {
+        res();
+        return;
       }
+
+      const watcher = chokidar.watch(paths, {
+        alwaysStat: true,
+        awaitWriteFinish: true,
+        ...options,
+      });
+
+      watcher.on('error', err => onError(err));
+
+      watcher.on('ready', () => {
+        try {
+          const watchedPaths = watcher.getWatched();
+
+          res({
+            watcher,
+            watchedPaths,
+          });
+        } catch (err) {
+          rej(err);
+        }
+      });
+
+      watcher.on('all', async (event, filepath, stats) => {
+        try {
+          if (!stats) return;
+
+          let cachedObject = null;
+
+          if (cacheMap && !stats.isDirectory()) {
+            cachedObject = cacheMap.get(filepath);
+
+            if (event === 'add' || event === 'change') {
+              if (!cachedObject) {
+                cachedObject = createCacheEntry(filepath, stats);
+
+                if (cachedObject) {
+                  cacheMap.set(filepath, cachedObject);
+                }
+              }
+            } else if (event === 'unlink') {
+              cachedObject = null;
+              cacheMap.delete(filepath);
+            }
+          }
+
+          if (onEvent) {
+            await onEvent({
+              event,
+              filepath,
+              stats,
+              cachedObject,
+              watcher,
+            });
+          }
+        } catch (err) {
+          err.path = filepath;
+
+          onError(err);
+        }
+      });
+    } catch (err) {
+      rej(err);
+    }
   });
 }
 
-const renderFilesThrottled = throttle(renderFiles, 1, 1000);
+const renderFilesThrottled = throttle(renderFiles, 1, ENV.DEPENDENCIES_RENDER_DELAY);
 
 async function main() {
-  const confPath = ENV.CONFIG_PATH;
-  const conf = await getConfig(confPath);
-  const configItems = parseConfig(conf);
+  const { config, configDeps } = await getConfig();
+  const configItems = parseConfig(config);
 
   const shouldWatch = configItems.some(v => v.watch);
   const watchItems = [];
 
-  if (shouldWatch) {
+  function onError(err) {
+    log.error(err);
+
+    if (!shouldWatch) {
+      process.exit(1);
+    }
+  }
+
+  if (shouldWatch && configDeps.length) {
     await watchFiles({
-      paths: [confPath],
+      paths: configDeps,
       options: {
         awaitWriteFinish: true,
       },
-      onEvent: ({ event, watcher, filepath }) => {
-        if (event === 'unlink') {
-          log.error(`Config file has been removed. ${filepath}`);
-
-          process.exit(1);
-          return;
-        }
-
+      onError,
+      onEvent: ({ event, watcher }) => {
         if (event !== 'change') return;
 
         log.info(`Config changed. Reloading...`);
@@ -199,6 +204,7 @@ async function main() {
       ].map((args) => {
         return watchFiles({
           ...args,
+          onError,
           onEvent: async ({ event, cachedObject }) => {
             if (!srcInit || !eventsSet.has(event)) return;
 
@@ -230,6 +236,7 @@ async function main() {
 
         return createFileObj(filepath, f);
       },
+      onError,
       onEvent: async ({ event, stats, cachedObject }) => {
         if (stats.isDirectory()) return;
 
@@ -253,7 +260,7 @@ async function main() {
         ...watchDepItems,
         watchFilesItem,
       ].filter(v => v)
-       .forEach(({ watcher }) => {
+        .forEach(({ watcher }) => {
           watcher.close();
         });
     }
