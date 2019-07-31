@@ -7,6 +7,8 @@ const schema = Joi.object({
   RENDER_FILES_CONCURRENCY: Joi.number().integer().min(0).default(1000),
   DEPENDENCIES_RENDER_DELAY: Joi.number().integer().min(0).default(1000),
   RENDER_FILE_DELAY: Joi.number().integer().min(0).default(500),
+  AWAIT_FILE_WRITE_BEFORE_RENDER: Joi.number().integer().min(0).default(2000),
+  AWAIT_FILE_WRITE_POLL_INTERVAL: Joi.number().integer().min(0).default(100),
 });
 
 const { value, error } = schema.validate(process.env, {

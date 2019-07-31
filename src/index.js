@@ -32,7 +32,10 @@ function watchFiles(args) {
 
       const watcher = chokidar.watch(paths, {
         alwaysStat: true,
-        awaitWriteFinish: true,
+        awaitWriteFinish: {
+          stabilityThreshold: ENV.AWAIT_FILE_WRITE_BEFORE_RENDER,
+          pollInterval: ENV.AWAIT_FILE_WRITE_POLL_INTERVAL,
+        },
         ...options,
       });
 
@@ -115,9 +118,6 @@ async function main() {
   if (shouldWatch && configDeps.length) {
     await watchFiles({
       paths: configDeps,
-      options: {
-        awaitWriteFinish: true,
-      },
       onError,
       onEvent: ({ event, watcher }) => {
         if (event !== 'change') return;
