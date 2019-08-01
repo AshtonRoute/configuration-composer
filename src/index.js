@@ -102,6 +102,9 @@ const renderFilesThrottled = throttle(renderFiles, 1, ENV.DEPENDENCIES_RENDER_DE
 
 async function main() {
   const { config, configDeps } = await getConfig();
+
+  log.debug(config);
+
   const configItems = parseConfig(config);
 
   const shouldWatch = configItems.some(v => v.watch);

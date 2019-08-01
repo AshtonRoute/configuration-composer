@@ -153,10 +153,13 @@ async function renderFile(args) {
   }
 
 
-  const { stderr } = await execFileAsync(ENV.GOMPLATE_BIN_PATH, execArgs);
+  try {
+    const { stderr } = await execFileAsync(ENV.GOMPLATE_BIN_PATH, execArgs);
 
-  if (stderr) {
-    const err = new Error(stderr);
+    if (stderr) {
+      throw new Error(stderr);
+    }
+  } catch (err) {
     err.path = this.filepath;
 
     throw err;

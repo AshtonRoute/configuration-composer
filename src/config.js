@@ -116,7 +116,7 @@ async function getConfig() {
         throw new Error(`Use either CONFIG_PATH env or "-f" option of CONFIG_TEMPLATE_ARGS env [${ENV.CONFIG_TEMPLATE_ARGS}] but not both`);
       }
 
-      args.f = value.CONFIG_PATH;
+      args.f = ENV.CONFIG_PATH;
     }
 
     const cmd = args._[0];
@@ -154,17 +154,40 @@ async function getConfig() {
       throw new Error('CONFIG_TEMPLATE_ARGS env requires at least one argument');
     }
 
-    const { stdout } = await execFileAsync(cmd, cmdArgs);
+    let conf = null;
+
+    try {
+      const { stdout, stderr } = await execFileAsync(cmd, cmdArgs);
+
+      if (stderr) {
+        throw new Error(stderr);
+      }
+
+      conf = stdout;
+    } catch (err) {
+      err.cmd = cmd;
+      err.cmdArgs = cmdArgs;
+
+      throw err;
+    }
 
     return {
-      config: stdout,
+      config: conf,
       configDeps: [...configDeps],
     };
   } else {
+    let conf = null;
+
+    try {
+      conf = await fs.readFile(ENV.CONFIG_PATH, 'utf8');
+    } catch (err) {
+      if (err.code !== 'ENOENT') {
+        throw err;
+      }
+    }
+
     const { dir, name } = path.parse(ENV.CONFIG_PATH);
     const curPath = path.join(dir, name);
-
-    let conf = null;
 
     try {
       conf = await fs.readFile(`${curPath}.yaml`, 'utf8');
@@ -174,7 +197,15 @@ async function getConfig() {
       }
     }
 
-    conf = await fs.readFile(`${curPath}.yml`, 'utf8');
+    try {
+      conf = await fs.readFile(`${curPath}.yml`, 'utf8');
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        throw new Error(`Couldn't find config at ${ENV.CONFIG_PATH} or ${curPath}.yml or ${curPath}.yaml`);
+      }
+
+      throw err;
+    }
 
     return {
       config: conf,
