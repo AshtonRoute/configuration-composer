@@ -1,4 +1,8 @@
 - watch: true
+
+  custom:
+  - /custom/**/*.js
+
   dependencies:
   - /smth/somefile
 

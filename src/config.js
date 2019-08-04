@@ -2,15 +2,17 @@ const YAML = require('yaml');
 const path = require('path');
 const { URL } = require('url');
 const fs = require('fs-extra');
-const { execFile } = require('child_process');
 const { promisify } = require('util');
-const argsparse = require('yargs-parser');
 const Joi = require('@hapi/joi');
 const { partition, template } = require('lodash');
+const { Environment } = require('nunjucks');
 
 const ENV = require('./environment').default;
+const FileLoader = require('./nunjucks/FileLoader').default;
+const nunjucksSetup = require('./nunjucks').default;
 
-const execFileAsync = promisify(execFile);
+Environment.prototype.renderAsync = promisify(Environment.prototype.render);
+Environment.prototype.renderStringAsync = promisify(Environment.prototype.renderString);
 
 function checkUniqueField(field) {
   return (v1, v2) => {
@@ -78,6 +80,7 @@ const ConfigItemSchema = Joi.object({
   watch: Joi.boolean().default(false),
   dependencies: Joi.array().items(FilePathSchema).unique(checkUniqueField('path')).default([]),
   templates: Joi.array().items(FilePathSchema).unique(checkUniqueField('path')).default([]),
+  custom: Joi.array().items(FilePathSchema).unique(checkUniqueField('path')).default([]),
   datasources: Joi.array().items(DataSourceSchema).unique(checkUniqueField('url')).default([]),
   files: Joi.array().items(FileSchema).default([]).unique(checkUniqueField('input_path')),
   on_change: onChangeSchema,
@@ -108,110 +111,49 @@ function getPathFromArg(arg, v) {
 }
 
 async function getConfig() {
-  if (ENV.CONFIG_TEMPLATE_ARGS) {
-    const args = argsparse(ENV.CONFIG_TEMPLATE_ARGS);
+  let conf = null;
 
-    if (process.env.CONFIG_PATH) {
-      if (args.f) {
-        throw new Error(`Use either CONFIG_PATH env or "-f" option of CONFIG_TEMPLATE_ARGS env [${ENV.CONFIG_TEMPLATE_ARGS}] but not both`);
-      }
-
-      args.f = ENV.CONFIG_PATH;
-    }
-
-    const cmd = args._[0];
-    const configDeps = new Set();
-
-    delete args._;
-
-    const cmdArgs = Object.keys(args).reduce((arr, k) => {
-      const curVal = args[k];
-
-      if (Array.isArray(curVal)) {
-        curVal.forEach(v => {
-          const depPath = getPathFromArg(k, v);
-
-          if (depPath) {
-            configDeps.add(depPath);
-          }
-
-          arr.push(`-${k}`, v);
-        });
-      } else {
-        const depPath = getPathFromArg(k, curVal);
-
-        if (depPath) {
-          configDeps.add(depPath);
-        }
-
-        arr.push(`-${k}`, curVal);
-      }
-
-      return arr;
-    }, []);
-
-    if (!cmdArgs.length) {
-      throw new Error('CONFIG_TEMPLATE_ARGS env requires at least one argument');
-    }
-
-    let conf = null;
-
-    try {
-      const { stdout, stderr } = await execFileAsync(cmd, cmdArgs);
-
-      if (stderr) {
-        throw new Error(stderr);
-      }
-
-      conf = stdout;
-    } catch (err) {
-      err.cmd = cmd;
-      err.cmdArgs = cmdArgs;
-
+  try {
+    conf = await fs.readFile(ENV.CONFIG_PATH, 'utf8');
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
       throw err;
     }
-
-    return {
-      config: conf,
-      configDeps: [...configDeps],
-    };
-  } else {
-    let conf = null;
-
-    try {
-      conf = await fs.readFile(ENV.CONFIG_PATH, 'utf8');
-    } catch (err) {
-      if (err.code !== 'ENOENT') {
-        throw err;
-      }
-    }
-
-    const { dir, name } = path.parse(ENV.CONFIG_PATH);
-    const curPath = path.join(dir, name);
-
-    try {
-      conf = await fs.readFile(`${curPath}.yaml`, 'utf8');
-    } catch (err) {
-      if (err.code !== 'ENOENT') {
-        throw err;
-      }
-    }
-
-    try {
-      conf = await fs.readFile(`${curPath}.yml`, 'utf8');
-    } catch (err) {
-      if (err.code === 'ENOENT') {
-        throw new Error(`Couldn't find config at ${ENV.CONFIG_PATH} or ${curPath}.yml or ${curPath}.yaml`);
-      }
-
-      throw err;
-    }
-
-    return {
-      config: conf,
-      configDeps: [curPath],
-    };
   }
+
+  const { dir, name } = path.parse(ENV.CONFIG_PATH);
+  let curPath = path.join(dir, name);
+
+  try {
+    conf = await fs.readFile(`${curPath}.yaml`, 'utf8');
+    curPath = `${curPath}.yaml`;
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      throw err;
+    }
+  }
+
+  try {
+    conf = await fs.readFile(`${curPath}.yml`, 'utf8');
+    curPath = `${curPath}.yml`;
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      throw new Error(`Couldn't find config at ${ENV.CONFIG_PATH} or ${curPath}.yml or ${curPath}.yaml`);
+    }
+
+    throw err;
+  }
+
+  const tmpEnv = new Environment([new FileLoader()]);
+
+  nunjucksSetup(tmpEnv);
+
+  conf = await tmpEnv.renderStringAsync(conf);
+
+  return {
+    config: conf,
+    configDeps: [curPath],
+  };
 }
 
 function mapOnChange(v) {
@@ -318,7 +260,12 @@ function parseConfig(conf) {
 
     item.dependencies = item.dependencies.map(v => mapFilePath(v));
     item.templates = item.templates.map(v => mapFilePath(v));
+    item.custom = item.custom.map(v => mapFilePath(v));
     item.files = item.files.map(v => mapFile(v));
+
+    item.env = new Environment([new FileLoader()]);
+
+    nunjucksSetup(item.env);
 
     return item;
   });

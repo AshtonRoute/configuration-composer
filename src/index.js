@@ -1,12 +1,13 @@
 const anymatch = require('anymatch').default;
 const chokidar = require('chokidar');
-const throttle = require('p-throttle');
+const debounce = require('p-debounce');
 
 const ENV = require('./environment').default;
 const { getConfig, parseConfig } = require('./config');
 const { renderFiles, createFileObj } = require('./render');
 const log = require('./logger').default;
 const { parsePath } = require('./utils');
+const nunjucksHelpers = require('./nunjucks/helpers').default;
 
 const eventsSet = new Set([
   'add',
@@ -98,7 +99,7 @@ function watchFiles(args) {
   });
 }
 
-const renderFilesThrottled = throttle(renderFiles, 1, ENV.DEPENDENCIES_RENDER_DELAY);
+const renderFilesDebounced = debounce(renderFiles, ENV.DEPENDENCIES_RENDER_DELAY);
 
 async function main() {
   const { config, configDeps } = await getConfig();
@@ -142,6 +143,7 @@ async function main() {
   await Promise.all(configItems.map(async (confItem) => {
     const {
       watch,
+      custom,
       dependencies,
       fileDataSources,
       otherDataSources,
@@ -161,18 +163,39 @@ async function main() {
     const watchDepItems = await Promise.all(
       [
         {
+          paths: custom.map(v => v.path),
+          onEvent: async ({ event, filepath }) => {
+            if (!eventsSet.has(event)) return;
+
+            delete require.cache[filepath];
+            const curModule = require(filepath).default;
+
+            curModule(confItem.env, nunjucksHelpers);
+
+            if (!srcInit) return;
+
+            await renderFilesDebounced({
+              otherDataSources,
+              cacheMaps,
+              configItem: confItem,
+            });
+          },
+        },
+
+        {
           paths: fileDataSources.map(v => v.path),
           cacheMap: cacheMaps.datasources,
           createCacheEntry: (filepath) => {
             const f = fileDataSources.find(v => v.path === filepath || anymatch(v.path, filepath));
             if (!f) return null;
 
-            const pathObj = parsePath(filepath, f.path);
+            const pathObject = parsePath(filepath, f.path);
 
             return {
               filepath,
               file: f,
-              outputAlias: f.makeAlias(pathObj),
+              outputAlias: f.makeAlias(pathObject),
+              pathObject,
             };
           },
         },
@@ -206,18 +229,18 @@ async function main() {
         },
       ].map((args) => {
         return watchFiles({
-          ...args,
           onError,
           onEvent: async ({ event, cachedObject }) => {
             if (!srcInit || !eventsSet.has(event)) return;
 
-            await renderFilesThrottled({
+            await renderFilesDebounced({
               otherDataSources,
               cacheMaps,
               configItem: confItem,
               changedObject: cachedObject,
             });
           },
+          ...args,
         });
       })
     ).then(arr => arr.filter(v => v));

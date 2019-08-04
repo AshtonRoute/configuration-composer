@@ -1,9 +1,11 @@
 const Bluebird = require('bluebird');
+const YAML = require('yaml');
 const { execFile, spawn } = require('child_process');
 const { promisify } = require('util');
 const path = require('path');
 const fs = require('fs-extra');
-const throttle = require('p-throttle');
+const debounce = require('p-debounce');
+const { merge, set } = require('lodash');
 
 const ENV = require('./environment').default;
 const log = require('./logger').default;
@@ -74,95 +76,51 @@ function createFileObj(filepath, file) {
     newFile.outputDir = path.dirname(outputPath);
   }
 
-  newFile.render = throttle(renderFile, 1, ENV.RENDER_FILE_DELAY).bind(newFile);
+  newFile.render = debounce(renderFile, ENV.RENDER_FILE_DELAY).bind(newFile);
 
   return newFile;
 }
 
 async function renderFile(args) {
   const {
-    otherDataSources,
     cacheMaps,
     configItem,
     changedObject,
   } = args;
 
-  const execArgs = [];
+  const ctx = {};
 
-  cacheMaps.datasources.forEach(({ filepath, outputAlias, file }) => {
-    let val = filepath;
+  await Bluebird.map(cacheMaps.datasources, async ([filepath, { outputAlias }]) => {
+    const content = await fs.readFile(filepath, 'utf8');
+    const obj = YAML.parse(content);
 
-    if (outputAlias) {
-      val = `${outputAlias}=${val}`;
-    }
+    const newCtx = {};
+    set(newCtx, outputAlias, obj);
 
-    execArgs.push('-d', val);
-
-    if (file.args) {
-      file.args.forEach(v => {
-        execArgs.push(v);
-      })
-    }
+    merge(ctx, newCtx);
   });
 
-  otherDataSources.forEach(({ url, alias, file }) => {
-    let val = url;
-
-    if (alias) {
-      val = `${alias}=${val}`;
-    }
-
-    execArgs.push('-d', val);
-
-    if (file.args) {
-      file.args.forEach(v => {
-        execArgs.push(v);
-      })
-    }
-  });
-
-  cacheMaps.templates.forEach(({ filepath, file }) => {
-    execArgs.push('-t', filepath);
-
-    if (file.args) {
-      file.args.forEach(v => {
-        execArgs.push(v);
-      })
-    }
-  });
-
-  cacheMaps.dependencies.forEach(({ file }) => {
-    if (file.args) {
-      file.args.forEach(v => {
-        execArgs.push(v);
-      })
-    }
-  });
-
-  execArgs.push('-f', this.filepath);
-
-  if (this.outputPath) {
-    execArgs.push('-o', this.outputPath);
-    await fs.ensureDir(this.outputDir);
-  }
-
-  if (configItem.args) {
-    configItem.args.forEach(v => {
-      execArgs.push(v);
-    })
-  }
-
+  let renderedStr = null;
 
   try {
-    const { stderr } = await execFileAsync(ENV.GOMPLATE_BIN_PATH, execArgs);
-
-    if (stderr) {
-      throw new Error(stderr);
-    }
+    renderedStr = await configItem.env.renderAsync(this.filepath, ctx);
   } catch (err) {
     err.path = this.filepath;
 
     throw err;
+  }
+
+  if (this.outputPath) {
+    try {
+      await fs.writeFile(this.outputPath, renderedStr);
+    } catch (err) {
+      if (err.code == 'ENOENT') {
+        await fs.ensureDir(this.outputDir);
+        await fs.writeFile(this.outputPath, renderedStr);
+      } else {
+        throw err;
+      }
+    }
   }
 
   log.info({ input_path: this.filepath, output_path: this.outputPath, message: 'Template rendered' });

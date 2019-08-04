@@ -1,7 +1,7 @@
 version: '2.4'
 services:
   app:
-    image: docker.home.lan/gomplate-composer
+    image: docker.home.lan/gomplate-composer:nunjucks
     command: npm start
     environment:
       NODE_ENV: development
@@ -13,4 +13,5 @@ services:
     - ./test/datasources:/datasources:ro
     - ./test/templates:/templates:ro
     - ./test/files:/files:ro
+    - ./test/custom:/custom:ro
     - ./test/output:/output:rw

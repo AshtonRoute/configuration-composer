@@ -1,1 +1,12 @@
 bla bla 123
+{{ path.join('/test', 'other') }}
+{{ { smth: 'awd' } | data.toYAML }}
+{{ '/' | fs.pathExists }}
+
+{% set testObj = { waat: 'awdawd', a: { b: 1 } } %}
+{{ '{{ a.b }}' | template.inline(testObj) }}
+
+{% set dirs = '/' | fs.readdir %}
+{% asyncEach dir in dirs %}
+{{ dir -}}
+{% endeach %}
