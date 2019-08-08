@@ -3,6 +3,7 @@ const {
   uniq,
 } = require('lodash');
 
+const globby = require('globby');
 const { Environment } = require('nunjucks');
 const YAML = require('yaml');
 const TOML = require('@iarna/toml');
@@ -44,6 +45,14 @@ async function renderInline(inputStr, ctx = {}) {
   return str;
 }
 
+function findPaths(...args) {
+  return globby(...args);
+}
+
+function findPathsSync(...args) {
+  return globby.sync(...args);
+}
+
 module.exports.utils = module.exports.Utils = {
   mergeWithArrays,
   mergeWithArraysUnique,
@@ -62,4 +71,9 @@ module.exports.data = module.exports.Data = {
 
 module.exports.template = module.exports.Template = {
   inline: renderInline,
+};
+
+module.exports.fs = module.exports.FS = module.exports.io = module.exports.IO = {
+  findPaths,
+  findPathsSync,
 };

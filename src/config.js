@@ -49,7 +49,7 @@ const DataSourceSchema = Joi.alternatives().try([
   Joi.string().required(),
   Joi.object({
     url: Joi.string().uri().required(),
-    alias: Joi.string().alphanum(),
+    alias: Joi.string().default('[fullSubdirectoryObjectPath]'),
     on_change: onChangeSchema,
     args: argsSchema,
   }),

@@ -8,7 +8,6 @@
 
   datasources:
   - url: file:///datasources/**/*.yml
-    alias: test
 
   templates:
   - /templates/template1.tmpl.yml

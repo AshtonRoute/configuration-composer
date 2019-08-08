@@ -3,6 +3,9 @@ bla bla 123
 {{ { smth: 'awd' } | data.toYAML }}
 {{ '/' | fs.pathExists }}
 
+Nested alias: {{ hdrghrdh | data.toJSON }}
+Nested alias: {{ secrets.abs }}
+
 {% set testObj = { waat: 'awdawd', a: { b: 1 } } %}
 {{ '{{ a.b }}' | template.inline(testObj) }}
 
