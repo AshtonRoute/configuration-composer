@@ -7,7 +7,6 @@ const { getConfig, parseConfig } = require('./config');
 const { renderFiles, createFileObj } = require('./render');
 const log = require('./logger').default;
 const { parsePath } = require('./utils');
-const nunjucksHelpers = require('./nunjucks/helpers').default;
 
 const eventsSet = new Set([
   'add',
@@ -133,6 +132,11 @@ async function main() {
         });
 
         watcher.close();
+
+        Object.keys(require.cache).forEach(k => {
+          delete require.cache[k];
+        });
+
         main().catch(log.error);
       },
     });
@@ -170,7 +174,10 @@ async function main() {
             delete require.cache[filepath];
             const curModule = require(filepath).default;
 
-            curModule(confItem.env, nunjucksHelpers);
+            const newEnv = curModule(confItem.env);
+            if (newEnv != null) {
+              confItem.env = newEnv;
+            }
 
             if (!srcInit) return;
 

@@ -10,11 +10,11 @@
   - url: file:///datasources/**/*.yml
 
   templates:
-  - /templates/template1.tmpl.yml
-  - /templates/smth/**/*.tmpl
+  - /templates/template1.yml.ejs
+  - /templates/smth/**/*.ejs
 
   files:
-  - input_path: /files/template1.tmpl.yml
-    output_path: /output/[name].[ext]
-  - input_path: /files/smth/**/*.tmpl
-    output_path: /output/smth/[subdirectory]/[name].[ext]
+  - input_path: /files/template1.yml.ejs
+    output_path: /output/[name].[extsWithoutLast]
+  - input_path: /files/smth/**/*.ejs
+    output_path: /output/smth/[subdirectory]/[name].[extsWithoutLast]

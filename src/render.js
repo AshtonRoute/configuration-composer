@@ -1,17 +1,16 @@
 const Bluebird = require('bluebird');
 const YAML = require('yaml');
-const { execFile, spawn } = require('child_process');
-const { promisify } = require('util');
+const { spawn } = require('child_process');
 const path = require('path');
+const { createRequire } = require('module');
 const fs = require('fs-extra');
 const debounce = require('p-debounce');
 const { merge, set } = require('lodash');
+const ejs = require('ejs');
 
 const ENV = require('./environment').default;
 const log = require('./logger').default;
 const { parsePath, normalizePath } = require('./utils');
-
-const execFileAsync = promisify(execFile);
 
 function spawnProc(args, filepath = '') {
   return new Promise((res, rej) => {
@@ -66,6 +65,7 @@ function createFileObj(filepath, file) {
     outputPath: null,
     outputDir: null,
     render: null,
+    requireRelative: createRequire(path.dirname(filepath)),
   };
 
   if (file.output_path) {
@@ -103,7 +103,11 @@ async function renderFile(args) {
   let renderedStr = null;
 
   try {
-    renderedStr = await configItem.env.renderAsync(this.filepath, ctx);
+    renderedStr = await ejs.renderFile(this.filepath, {
+      ...configItem.env.context,
+      ...ctx,
+      requireRelative: this.requireRelative,
+    }, configItem.env);
   } catch (err) {
     err.path = this.filepath;
 

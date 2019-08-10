@@ -1,11 +1,12 @@
 # syntax = docker/dockerfile:experimental
-FROM node:12.7.0-alpine
+FROM node:12.8.0-alpine
 
 RUN \
   --mount=type=cache,target=/var/cache/apk \
   --mount=type=cache,target=/var/lib/apk \
   --mount=type=cache,target=/etc/apk/cache \
   apk --update add \
+  git \
   bash \
   curl
 

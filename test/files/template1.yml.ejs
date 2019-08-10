@@ -1,0 +1,24 @@
+bla bla 1234
+<% const { isString } = require('lodash'); %>
+<%- isString('awdawd') %>
+
+<% const path = require('path'); %>
+<%- path.join('/test', 'other') %>
+
+<% const YAML = require('yaml') %>
+<%- YAML.stringify({ smth: 'awd' }) %>
+
+
+<% const fs = require('fs-extra') %>
+<%- await fs.pathExists('/') %>
+
+Nested alias: <%- JSON.stringify(hdrghrdh) %>
+Nested alias: <%- secrets.abs %>
+
+<% const testObj = { waat: 'awdawd', a: { b: 1 } } %>
+<%- await render('<' + '%- a.b %' + '>', testObj) %>
+
+<% const dirs = await fs.readdir('/') %>
+<% dirs.forEach(dir => { %>
+<%- dir -%>
+<% }) %>

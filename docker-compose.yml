@@ -1,7 +1,7 @@
 version: '2.4'
 services:
   app:
-    image: docker.home.lan/gomplate-composer:nunjucks
+    image: docker.home.lan/gomplate-composer:ejs
     command: npm start
     environment:
       NODE_ENV: development

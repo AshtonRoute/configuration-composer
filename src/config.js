@@ -2,17 +2,12 @@ const YAML = require('yaml');
 const path = require('path');
 const { URL } = require('url');
 const fs = require('fs-extra');
-const { promisify } = require('util');
 const Joi = require('@hapi/joi');
 const { partition, template } = require('lodash');
-const { Environment } = require('nunjucks');
+const ejs = require('ejs');
 
 const ENV = require('./environment').default;
-const FileLoader = require('./nunjucks/FileLoader').default;
-const nunjucksSetup = require('./nunjucks').default;
-
-Environment.prototype.renderAsync = promisify(Environment.prototype.render);
-Environment.prototype.renderStringAsync = promisify(Environment.prototype.renderString);
+const runtimeSetup = require('./runtime').default;
 
 function checkUniqueField(field) {
   return (v1, v2) => {
@@ -144,11 +139,8 @@ async function getConfig() {
     throw err;
   }
 
-  const tmpEnv = new Environment([new FileLoader()]);
-
-  nunjucksSetup(tmpEnv);
-
-  conf = await tmpEnv.renderStringAsync(conf);
+  const opts = runtimeSetup();
+  conf = await ejs.render(conf, opts.context, opts);
 
   return {
     config: conf,
@@ -263,9 +255,7 @@ function parseConfig(conf) {
     item.custom = item.custom.map(v => mapFilePath(v));
     item.files = item.files.map(v => mapFile(v));
 
-    item.env = new Environment([new FileLoader()]);
-
-    nunjucksSetup(item.env);
+    item.env = runtimeSetup();
 
     return item;
   });
