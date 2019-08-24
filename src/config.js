@@ -4,8 +4,8 @@ const { URL } = require('url');
 const fs = require('fs-extra');
 const Joi = require('@hapi/joi');
 const { partition, template } = require('lodash');
-const ejs = require('ejs');
 
+const ejs = require('./ejs');
 const ENV = require('./environment').default;
 const runtimeSetup = require('./runtime').default;
 
@@ -27,17 +27,20 @@ function checkUniqueField(field) {
   };
 }
 
-const argsSchema = Joi.array().min(1);
+const argsSchema = Joi.array().items(Joi.string()).min(1);
 
-const onChangeCmdSchema = Joi.array().min(1);
+const onChangeCmdSchema = Joi.array().items(Joi.string()).min(1);
+
+const onChangeCmdObjectSchema = Joi.object({
+  command: onChangeCmdSchema.required(),
+  stdout: Joi.boolean().default(false),
+  stderr: Joi.boolean().default(true),
+});
 
 const onChangeSchema = Joi.alternatives().try([
   onChangeCmdSchema,
-  Joi.object({
-    command: onChangeCmdSchema,
-    stdout: Joi.boolean().default(false),
-    stderr: Joi.boolean().default(true),
-  }),
+  onChangeCmdObjectSchema,
+  Joi.array().items(onChangeCmdObjectSchema).min(1),
 ]);
 
 const DataSourceSchema = Joi.alternatives().try([
@@ -139,8 +142,8 @@ async function getConfig() {
     throw err;
   }
 
-  const opts = runtimeSetup();
-  conf = await ejs.render(conf, opts.context, opts);
+  const { data, options } = runtimeSetup();
+  conf = await ejs.render(conf, data, options);
 
   return {
     config: conf,
@@ -150,14 +153,20 @@ async function getConfig() {
 
 function mapOnChange(v) {
   if (Array.isArray(v)) {
-    return {
-      command: v,
-      stdout: false,
-      stderr: true,
-    };
+    if (typeof v[0] === 'string') {
+      return [
+        {
+          command: v,
+          stdout: false,
+          stderr: true,
+        },
+      ];
+    }
+
+    return v;
   }
 
-  return v;
+  return [v];
 }
 
 function mapDataSource(v) {

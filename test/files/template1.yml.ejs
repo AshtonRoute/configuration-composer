@@ -1,6 +1,8 @@
 bla bla 1234
-<% const { isString } = require('lodash'); %>
+<% const { isString, uniq } = require('lodash'); %>
 <%- isString('awdawd') %>
+<%- ['a', 'a'] |> uniq %>
+<%- this %>
 
 <% const path = require('path'); %>
 <%- path.join('/test', 'other') %>
@@ -12,11 +14,11 @@ bla bla 1234
 <% const fs = require('fs-extra') %>
 <%- await fs.pathExists('/') %>
 
-Nested alias: <%- JSON.stringify(hdrghrdh) %>
-Nested alias: <%- secrets.abs %>
+Nested alias: <%- JSON.stringify(ctx.hdrghrdh) %>
+Nested alias: <%- ctx.secrets.abs %>
 
-<% const testObj = { waat: 'awdawd', a: { b: 1 } } %>
-<%- await render('<' + '%- a.b %' + '>', testObj) %>
+<% const testObj = { waat: 'awdawd', a: { b: 1 } } -%>
+<%- await inline('<' + '%- ctx.a.b %' + '>', testObj) %>
 
 <% const dirs = await fs.readdir('/') %>
 <% dirs.forEach(dir => { %>

@@ -1,20 +1,25 @@
 - watch: true
 
   custom:
-  - /custom/**/*.js
+    - /custom/**/*.js
 
   dependencies:
-  - /smth/somefile
+    - /smth/somefile
 
   datasources:
-  - url: file:///datasources/**/*.yml
+    - url: file:///datasources/**/*.yml
 
   templates:
-  - /templates/template1.yml.ejs
-  - /templates/smth/**/*.ejs
+    - /templates/template1.yml.ejs
+    - /templates/smth/**/*.ejs
 
   files:
-  - input_path: /files/template1.yml.ejs
-    output_path: /output/[name].[extsWithoutLast]
-  - input_path: /files/smth/**/*.ejs
-    output_path: /output/smth/[subdirectory]/[name].[extsWithoutLast]
+    - input_path: /files/template1.yml.ejs
+      output_path: /output/[name].[extsWithoutLast]
+      on_change:
+        - command:
+            - echo
+            - hi
+          stdout: true
+    - input_path: /files/smth/**/*.ejs
+      output_path: /output/smth/[subdirectory]/[name].[extsWithoutLast]

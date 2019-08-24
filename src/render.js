@@ -6,8 +6,8 @@ const { createRequire } = require('module');
 const fs = require('fs-extra');
 const debounce = require('p-debounce');
 const { merge, set } = require('lodash');
-const ejs = require('ejs');
 
+const ejs = require('./ejs');
 const ENV = require('./environment').default;
 const log = require('./logger').default;
 const { parsePath, normalizePath } = require('./utils');
@@ -20,7 +20,7 @@ function spawnProc(args, filepath = '') {
 
       const [procName, ...procArgs] = args.command;
 
-      const curProc = spawn(procName, procArgs);
+      const curProc = spawn(procName, procArgs, { shell: '/bin/bash' });
 
       // drain stdout stream anyway
       curProc.stdout.on('data', (data) => {
@@ -104,10 +104,10 @@ async function renderFile(args) {
 
   try {
     renderedStr = await ejs.renderFile(this.filepath, {
-      ...configItem.env.context,
+      ...configItem.env.data,
       ...ctx,
       requireRelative: this.requireRelative,
-    }, configItem.env);
+    }, configItem.env.options);
   } catch (err) {
     err.path = this.filepath;
 
@@ -131,12 +131,16 @@ async function renderFile(args) {
 
   const spawnArr = [];
 
-  if (this.on_change) {
-    spawnArr.push(this);
+  if (this.file.on_change && this.file.on_change.length) {
+    this.file.on_change.forEach(fn => {
+      spawnArr.push({ on_change: fn, filepath: this.filepath });
+    });
   }
 
-  if (configItem.on_change && changedObject === this) {
-    spawnArr.push({ on_change: configItem.on_change });
+  if (configItem.on_change && configItem.on_change.length && changedObject === this) {
+    configItem.on_change.forEach(fn => {
+      spawnArr.push({ on_change: fn, filepath: this.filepath });
+    });
   }
 
   spawnArr.forEach(v => {
@@ -166,15 +170,19 @@ async function renderFiles(args) {
   if (renderErrors.length !== cacheMaps.files.size) {
     const spawnArr = [];
 
-    if (changedObject && changedObject.file.on_change) {
-      spawnArr.push({
-        on_change: changedObject.file.on_change,
-        filepath: changedObject.filepath,
+    if (changedObject && changedObject.file.on_change && changedObject.file.on_change.length) {
+      changedObject.file.on_change.forEach(fn => {
+        spawnArr.push({
+          on_change: fn,
+          filepath: changedObject.filepath,
+        });
       });
     }
 
-    if (configItem.on_change) {
-      spawnArr.push({ on_change: configItem.on_change });
+    if (configItem.on_change && configItem.on_change.length) {
+      configItem.on_change.forEach(fn => {
+        spawnArr.push({ on_change: fn });
+      })
     }
 
     spawnArr.forEach(v => {

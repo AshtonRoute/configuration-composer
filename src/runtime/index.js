@@ -1,46 +1,25 @@
-const ejs = require('ejs');
+const ejs = require('../ejs');
 
-function setup(env = {}) {
-  if (!env.context) {
-    env.context = {};
-  }
-
-  env.client = false;
-  env.async = true;
-  env.debug = false;
-  env.compileDebug = true;
-  env.outputFunctionName = 'print';
-  env.delimiter = '%';
-  env.openDelimiter = '<';
-  env.closeDelimiter = '>';
-
-  env.context = {
-    process: process,
-    console: console,
-    require: require,
-
-    ENV: process.env,
-
-    async render(str, data = {}, opts = {}) {
-      const curOpts = setup();
-
-      const result = await ejs.render(
-        str,
-        {
-          ...curOpts.context,
-          ...data,
-        },
-        {
-          ...curOpts,
-          ...opts,
-        }
-      );
-
-      return result;
-    },
+function setup() {
+  const options = {
+    context: {},
+    _with: false,
+    localsName: 'ctx',
+    client: false,
+    async: true,
+    debug: false,
+    compileDebug: true,
+    outputFunctionName: 'print',
+    delimiter: '%',
+    openDelimiter: '<',
+    closeDelimiter: '>',
   };
 
-  return env;
+  const data = {
+    ENV: process.env,
+  };
+
+  return { data, options };
 }
 
 module.exports.default = setup;
