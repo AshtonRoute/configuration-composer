@@ -15,11 +15,11 @@
 
   files:
     - input_path: /files/template1.yml.ejs
-      output_path: /output/[name].[extsWithoutLast]
+      output_path: /output/[nameWithoutExt].[extsWithoutLast]
       on_change:
         - command:
             - echo
             - hi
           stdout: true
     - input_path: /files/smth/**/*.ejs
-      output_path: /output/smth/[subdirectory]/[name].[extsWithoutLast]
+      output_path: /output/smth/[subdirectory]/[nameWithoutExt].[extsWithoutLast]

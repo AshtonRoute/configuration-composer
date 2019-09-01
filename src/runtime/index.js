@@ -1,5 +1,3 @@
-const ejs = require('../ejs');
-
 function setup() {
   const options = {
     context: {},

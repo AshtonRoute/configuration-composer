@@ -25,7 +25,7 @@ function parsePath(filepath, pattern) {
 }
 
 function normalizePath(filepath) {
-  return filepath.replace(/\/\//g, '/');
+  return filepath.replace(/\/+/g, '/');
 }
 
 module.exports.parsePath = parsePath;
