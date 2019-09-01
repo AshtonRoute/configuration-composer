@@ -1,18 +1,19 @@
-version: '2.4'
+version: "3.7"
 services:
   app:
-    image: docker.home.lan/gomplate-composer:ejs
+    image: docker.home.lan/configuration-composer:ejs
+    build: .
     command: npm start
     environment:
       NODE_ENV: development
     volumes:
-    - ./src:/app/src:rw
-    - ./package.json:/app/package.json:rw
-    - ./yarn.lock:/app/yarn.lock:rw
-    - ./babel.config.js:/app/babel.config.js:ro
-    - ./test/config.yml:/config.yml:ro
-    - ./test/datasources:/datasources:ro
-    - ./test/templates:/templates:ro
-    - ./test/files:/files:ro
-    - ./test/custom:/custom:ro
-    - ./test/output:/output:rw
+      - ./src:/app/src:rw
+      - ./package.json:/app/package.json:rw
+      - ./yarn.lock:/app/yarn.lock:rw
+      - ./babel.config.js:/app/babel.config.js:ro
+      - ./test/config.yml:/config.yml:ro
+      - ./test/datasources:/datasources:ro
+      - ./test/templates:/templates:ro
+      - ./test/files:/files:ro
+      - ./test/custom:/custom:ro
+      - ./test/output:/output:rw

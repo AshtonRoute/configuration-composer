@@ -1,5 +1,2 @@
-docker build \
---progress=plain \
--t docker.home.lan/gomplate-composer:ejs \
-"${@}" \
-.
+docker buildx bake \
+--progress=plain

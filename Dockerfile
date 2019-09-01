@@ -1,5 +1,5 @@
 # syntax = docker/dockerfile:experimental
-FROM node:12.9.0-alpine
+FROM node:12.9.1-alpine
 
 RUN \
   --mount=type=cache,target=/var/cache/apk \
@@ -22,5 +22,7 @@ RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
 
 COPY babel.config.js /app/
 COPY src /app/src
+
+ENV NODE_ENV production
 
 CMD ["node", "/app/src"]
